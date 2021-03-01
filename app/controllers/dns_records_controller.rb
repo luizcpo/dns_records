@@ -1,23 +1,45 @@
+require 'pagy'
+
 class DnsRecordsController < ApplicationController
   skip_before_action :verify_authenticity_token
 
   def index
-    @dns_records = DnsRecord.all
+    # TODO treat the json query
+    content = JSON.parse(request.raw_post)
+
     records = []
     related_hostnames = []
-    
-    @dns_records.each do |dns|
-      records.push(_json_dns_record(dns))
-      related_hostnames.push(dns.hostnames.map{ |hostname| _json_hostname_record(hostname) })
+  
+    hostnames_should_have = content['hostnames']['should_have']
+    hostnames_shouldnt_have = content['hostnames']['shouldnt_have']
+    page_number = content['page']
+
+    # Fetch the DNS Records related to the hostnames with the hostnames on the should have list
+    if !hostnames_should_have.nil?
+      dns_should_have = pagy(DnsRecord.with_related_hostnames(hostnames_should_have), page: page_number)
+    else
+      dns_should_have = pagy(DnsRecord.all, page: page_number)
     end
 
-    @json = {
-      total_records: @dns_records.size,
-      records: records,
-      related_hostnames: related_hostnames
-    }
+    # Fetch the DNS Records related to the hostnames with the hostnames on the shouldnt have list
+    if !hostnames_shouldnt_have.nil?
+      dns_shouldnt_have = pagy(DnsRecord.with_related_hostnames(hostnames_shouldnt_have), page: page_number)
+    else
+      dns_shouldnt_have = pagy(DnsRecord.all, page: page_number)
+    end
+
+    @dns_records = dns_should_have - dns_shouldnt_have
     
-    render json: @json
+    # @dns_.each do |dns|
+    #   records.push(_json_dns_record(dns))
+    # end
+
+    # @json = {
+    #   total_records: @dns_.size,
+    #   records: records,
+    #   related_hostnames: related_hostnames
+    # }
+    render json: content
   end
 
   def create
@@ -34,7 +56,6 @@ class DnsRecordsController < ApplicationController
   end
 
   private
-
   def _json_dns_record(dns)
     {
       id: dns[:id],

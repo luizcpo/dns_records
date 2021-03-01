@@ -3,6 +3,13 @@ class DnsRecord < ApplicationRecord
 
     accepts_nested_attributes_for :hostnames
 
+    scope :with_related_hostnames, ->(hostnames_list) { 
+      joins(:hostnames)
+     .where(:hostnames => {:hostname => hostnames_list})
+     .group("dns_records.id")
+     .having(['COUNT(*) = ?', hostnames_list.length]) 
+    }
+
     def autosave_associated_records_for_hostnames
         existing_hostnames = []
         new_hostnames = []

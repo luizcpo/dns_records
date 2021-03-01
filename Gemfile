@@ -7,6 +7,8 @@ ruby '2.6.5'
 gem 'rails', '~> 5.2.4', '>= 5.2.4.5'
 # Rack::Cors provides support for Cross-Origin Resource Sharing (CORS) for Rack compatible web applications.
 gem 'rack-cors'
+# Pagy is the ultimate pagination gem that outperforms the others in each and every benchmark and comparison.
+gem 'pagy', '~> 3.5'
 # Use sqlite3 as the database for Active Record
 gem 'sqlite3'
 # Use Puma as the app server
