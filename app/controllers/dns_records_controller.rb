@@ -1,45 +1,53 @@
-require 'pagy'
-
 class DnsRecordsController < ApplicationController
+  include Pagy::Backend
+
   skip_before_action :verify_authenticity_token
 
   def index
     # TODO treat the json query
     content = JSON.parse(request.raw_post)
 
-    records = []
     related_hostnames = []
   
     hostnames_should_have = content['hostnames']['should_have']
     hostnames_shouldnt_have = content['hostnames']['shouldnt_have']
     page_number = content['page']
+    dns_shouldnt_have = nil
 
     # Fetch the DNS Records related to the hostnames with the hostnames on the should have list
     if !hostnames_should_have.nil?
-      dns_should_have = pagy(DnsRecord.with_related_hostnames(hostnames_should_have), page: page_number)
+      @pagy, dns_should_have = pagy(DnsRecord.with_related_hostnames(hostnames_should_have), page: page_number)
     else
-      dns_should_have = pagy(DnsRecord.all, page: page_number)
+      @pagy, dns_should_have = pagy(DnsRecord.all, page: page_number)
     end
 
     # Fetch the DNS Records related to the hostnames with the hostnames on the shouldnt have list
     if !hostnames_shouldnt_have.nil?
-      dns_shouldnt_have = pagy(DnsRecord.with_related_hostnames(hostnames_shouldnt_have), page: page_number)
-    else
-      dns_shouldnt_have = pagy(DnsRecord.all, page: page_number)
+      @pagy, dns_shouldnt_have = pagy(DnsRecord.with_related_hostnames(hostnames_shouldnt_have), page: page_number)
     end
 
-    @dns_records = dns_should_have - dns_shouldnt_have
-    
-    # @dns_.each do |dns|
-    #   records.push(_json_dns_record(dns))
-    # end
+    # Removing the dns related with the shouldnt have hostnames
+    if dns_shouldnt_have.nil?
+      @dns_records = dns_should_have
+    else
+      @dns_records = dns_should_have - dns_shouldnt_have
+    end
 
-    # @json = {
-    #   total_records: @dns_.size,
-    #   records: records,
-    #   related_hostnames: related_hostnames
-    # }
-    render json: content
+    hostnames_query = 'hostname IS NOT "'+hostnames_should_have.join('" AND hostname IS NOT "' )+'"'
+
+    @dns_records.each do |dns|
+      related_hostnames = related_hostnames + dns.hostnames.where(hostnames_query).to_a
+    end
+
+    related_hostnames.uniq!
+
+    @json = {
+      total_records: @dns_records.size,
+      records: @dns_records.map { |dns| _json_dns_record(dns) },
+      related_hostnames: related_hostnames.map { |hostname| _json_hostname_record(hostname) }
+    }
+
+    render json: @json
   end
 
   def create
