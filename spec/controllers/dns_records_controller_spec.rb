@@ -1,6 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe DnsRecordsController, type: :request do
+    # With due time I would like to do some factory with FactoryBot to avoid the following
     describe "GET #index" do
         before do
             if DnsRecord.find_by_ip_address("1.1.1.1").nil?

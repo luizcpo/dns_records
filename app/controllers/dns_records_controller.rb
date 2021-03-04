@@ -9,6 +9,8 @@ class DnsRecordsController < ApplicationController
   # TODO Another thing that I would do is to validate both the endpoint's
   # contracts using the json-schema gem maybe.
 
+  # TODO With more time, we could use a cache system as Redis for instance
+  # and get the API a little bit more efficient
   def index
     related_hostnames = []
   
