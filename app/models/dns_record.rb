@@ -3,6 +3,9 @@ class DnsRecord < ApplicationRecord
 
     accepts_nested_attributes_for :hostnames
 
+    validates :ip_address, presence: true, uniqueness: true
+    validates_associated :hostnames
+
     scope :with_related_hostnames, ->(hostnames_list) { 
       joins(:hostnames)
      .where(:hostnames => {:hostname => hostnames_list})

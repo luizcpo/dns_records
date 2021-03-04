@@ -3,15 +3,28 @@ class DnsRecordsController < ApplicationController
 
   skip_before_action :verify_authenticity_token
 
-  def index
-    # TODO treat the json query
-    content = JSON.parse(request.raw_post)
+  # TODO This action got really big, if I had more time, I would create a
+  # service to deal with most of the logic implemented here.
 
+  # TODO Another thing that I would do is to validate both the endpoint's
+  # contracts using the json-schema gem maybe.
+
+  def index
     related_hostnames = []
   
-    hostnames_should_have = content['hostnames']['should_have']
-    hostnames_shouldnt_have = content['hostnames']['shouldnt_have']
-    page_number = content['page']
+    if validate_hostnames_params('should_have')
+      hostnames_should_have = params['hostnames']['should_have']
+    else
+      hostnames_should_have = nil
+    end
+
+    if validate_hostnames_params('shouldnt_have')
+      hostnames_shouldnt_have = params['hostnames']['shouldnt_have']
+    else
+      hostnames_shouldnt_have = nil
+    end
+
+    page_number = params['page']
     dns_shouldnt_have = nil
 
     # Fetch the DNS Records related to the hostnames with the hostnames on the should have list
@@ -33,10 +46,17 @@ class DnsRecordsController < ApplicationController
       @dns_records = dns_should_have - dns_shouldnt_have
     end
 
-    hostnames_query = 'hostname IS NOT "'+hostnames_should_have.join('" AND hostname IS NOT "' )+'"'
+    # Getting the hostnames related with the dns records we fetched
+    if hostnames_should_have.nil?
+      @dns_records.each do |dns|
+        related_hostnames = related_hostnames + dns.hostnames.to_a
+      end
+    else
+      hostnames_query = 'hostname IS NOT "'+hostnames_should_have.join('" AND hostname IS NOT "' )+'"'
 
-    @dns_records.each do |dns|
-      related_hostnames = related_hostnames + dns.hostnames.where(hostnames_query).to_a
+      @dns_records.each do |dns|
+        related_hostnames = related_hostnames + dns.hostnames.where(hostnames_query).to_a
+      end
     end
 
     related_hostnames.uniq!
@@ -50,6 +70,9 @@ class DnsRecordsController < ApplicationController
     render json: @json
   end
 
+
+  # One thing that I would like to do is to create some kind of validation
+  # other then presence validation. Domain and IPV4 validation, maybe?
   def create
     content = JSON.parse(request.raw_post)
     
@@ -58,12 +81,17 @@ class DnsRecordsController < ApplicationController
       hostnames_attributes: content['dns_records']['hostnames_attributes']
     }
 
-    @dns_record = DnsRecord.create(attributes)
+    @dns_record = DnsRecord.new(attributes)
 
-    render json: { id: @dns_record.id }
+    if @dns_record.save(attributes)
+      render json: { id: @dns_record.id }
+    else
+      render json: @dns_record.errors.messages
+    end
   end
 
   private
+  
   def _json_dns_record(dns)
     {
       id: dns[:id],
@@ -76,5 +104,10 @@ class DnsRecordsController < ApplicationController
       hostname: hostname[:hostname],
       count: hostname.dns_records.size
     }
+  end
+
+  def validate_hostnames_params(params_name)
+    return false unless params.has_key? "hostnames"
+    params["hostnames"].has_key? params_name
   end
 end
